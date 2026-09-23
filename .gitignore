@@ -1,0 +1,39 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+/dist/
+/build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Frontend
+tracinator/ui/node_modules/
+tracinator/ui/dist/
+tracinator/ui/.env*.local
+
+# Tauri desktop shell
+src-tauri/target/
+src-tauri/gen/
+src-tauri/resources/
+
+# Updater signing keypair (see infra/scripts/publish_release.sh /
+# `npx tauri signer generate`). The .pub half is not secret and is already
+# baked into tauri.conf.json's plugins.updater.pubkey — this only excludes
+# the private half. Back this file up somewhere durable outside this
+# machine (password manager, etc.) — losing it means every future release
+# needs a new keypair, and every install that trusts the old pubkey can no
+# longer verify updates signed with a new one.
+src-tauri/updater_signing.key*
+
+# Terraform (infra/environments/releases)
+infra/**/.terraform/
+infra/**/*.tfstate
+infra/**/*.tfstate.*
+infra/**/*.tfplan
+infra/**/tfplan
+infra/**/.terraform.tfstate.lock.info
+
+infra/.env

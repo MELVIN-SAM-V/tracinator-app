@@ -1,0 +1,5 @@
+{
+  "bundle": {
+    "resources": ["resources/runtime-linux-x86_64.zip"]
+  }
+}

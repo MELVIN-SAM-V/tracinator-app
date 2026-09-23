@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: #0f1117;
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  /* App UI, not a webpage — dragging the window's title bar, a resize
+     divider, or just clicking around buttons/graph nodes shouldn't fall
+     into native text selection along the way. The code editor is the one
+     place selecting text is the actual point (copy/paste), so it's
+     explicitly re-enabled below; Monaco manages its own internal
+     editing/selection independently of this either way. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.monaco-editor,
+.monaco-editor * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Form fields (e.g. TraceArgsForm's argument textareas) manage their own
+   text selection independently of ancestor user-select in every browser
+   engine already — this is just an explicit belt-and-suspenders match for
+   the Monaco rule above, not covering an actual observed problem. */
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* React Flow canvas background */
+.react-flow__renderer {
+  background: #0f1117;
+}
+
+/* React Flow zooms via `transform: scale()` on .react-flow__viewport rather
+   than re-rendering at a new resolution — without a `will-change` hint, the
+   browser can end up reusing a rasterized bitmap of that pane's content
+   across scale changes instead of properly re-rastering it (GPU-scaling an
+   already-rendered image rather than actually redrawing crisper glyphs),
+   which reads as text staying persistently blurry at a given zoom level and
+   only sharpening again once the scale changes enough to force a fresh
+   raster (e.g. zooming back out). Promoting the pane to its own composited
+   layer up front fixes that at the cost of a bit of extra GPU memory —
+   trivial for a graph-sized canvas like this.  */
+.react-flow__viewport {
+  will-change: transform;
+}
+
+.react-flow__background {
+  background: #0f1117;
+}
+
+/* Variable highlight pulse */
+@keyframes pulse-border {
+  0%, 100% { box-shadow: 0 0 0 2px #818cf8, 0 0 8px 2px rgba(129,140,248,0.3); }
+  50% { box-shadow: 0 0 0 2px #a78bfa, 0 0 16px 4px rgba(167,139,250,0.5); }
+}
+
+/* Animated flow dot along edges */
+@keyframes flowDot {
+  0% { stroke-dashoffset: 24; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.edge-animated {
+  animation: flowDot 1.2s linear infinite;
+  stroke-dasharray: 6 18;
+}
+
+/* Repainting a dashed stroke every frame competes with the zoom transform
+   itself for main-thread time — on a graph with many branch edges (a big
+   function), that's what makes scrolling to zoom feel laggy. Paused for the
+   duration of an active pan/zoom (see GraphCanvas's onMoveStart/onMoveEnd)
+   and resumed once it settles. */
+.rf-interacting .edge-animated {
+  animation-play-state: paused;
+}
+
+/* Node hover glow */
+.node-glow-green {
+  box-shadow: 0 0 16px rgba(52, 211, 153, 0.4);
+}
+.node-glow-indigo {
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.4);
+}
+.node-glow-red {
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.4);
+}
+
+/* React Flow handle dots */
+.react-flow__handle {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background: #6366f1 !important;
+  border: 2px solid #0f1117 !important;
+}
+
+/* Minimap dark theme */
+.react-flow__minimap {
+  background: #1a1d27 !important;
+  border: 1px solid #2a2d3e !important;
+  border-radius: 8px !important;
+}
+
+/* Controls dark theme */
+.react-flow__controls {
+  background: #1a1d27 !important;
+  border: 1px solid #2a2d3e !important;
+  border-radius: 8px !important;
+}
+.react-flow__controls-button {
+  background: #1a1d27 !important;
+  border-color: #2a2d3e !important;
+  color: #94a3b8 !important;
+}
+.react-flow__controls-button:hover {
+  background: #2a2d3e !important;
+}
+
+/* Selection box */
+.react-flow__selection {
+  background: rgba(99, 102, 241, 0.1) !important;
+  border: 1px solid #6366f1 !important;
+}
+
+/* Onboarding coachmark: brightens the real button/field a tour step points at,
+   since its normal dimmed (text-gray-400) state disappears against the tour's
+   dark backdrop otherwise. Scoped to small, precise targets only — see
+   Onboarding.tsx's TourStep doc comment for why whole-panel steps skip this. */
+.tour-spotlight-active {
+  color: #ffffff !important;
+  filter: drop-shadow(0 0 6px rgba(129, 140, 248, 0.9));
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0f1117; }
+::-webkit-scrollbar-thumb { background: #2a2d3e; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3d4e; }
