@@ -10,6 +10,7 @@ One document per significant defect, vulnerability or security change, with the 
 | [RCA-004](RCA-004-traced-code-ran-under-servers-own-interpreter.md) | User code was executed by the server's own Python interpreter | Design | High | Resolved |
 | [RCA-005](RCA-005-demo-cross-request-code-execution-via-shared-temp-dir.md) | Demo: one visitor's leftover files could run inside another visitor's request | Security | Medium | Resolved |
 | [RCA-006](RCA-006-demo-cloud-credentials-readable-by-untrusted-code.md) | Demo: untrusted snippets could read the server's cloud credentials | Security | Medium | Resolved |
+| [RCA-007](RCA-007-updater-plugin-npm-rust-version-mismatch.md) | Release build blocked by an npm/Rust version mismatch in the updater plugin | Build | Medium | Resolved |
 
 RCA-001 to RCA-004 were extracted from the project's earlier design and review docs. RCA-005 and RCA-006 come from the 2026-09-20 security sweep.
 
