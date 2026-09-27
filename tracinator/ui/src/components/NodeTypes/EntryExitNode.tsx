@@ -14,7 +14,7 @@ export default function EntryExitNode({ data, selected }: NodeProps) {
       transition={{ duration: 0.18 }}
       className={`
         relative px-5 py-2 rounded-full border-2 border-emerald-400
-        bg-emerald-500/20 min-w-[140px] text-center
+        bg-emerald-500/20 min-w-[140px] max-w-[240px] text-center
         transition-all duration-150 cursor-pointer select-none
         hover:scale-105 node-glow-green
         ${selected ? 'outline outline-[3px] outline-white outline-offset-2' : ''}
@@ -22,10 +22,10 @@ export default function EntryExitNode({ data, selected }: NodeProps) {
       title={isEntry ? 'Show variables at entry' : 'Show variables at exit'}
     >
       <Handle type="target" position={Position.Top} style={{ background: '#34d399', border: '2px solid #0f1117', visibility: isEntry ? 'hidden' : 'visible' }} />
-      <div className="text-emerald-300 font-mono text-xs font-semibold">
+      <div className="text-emerald-300 font-mono text-xs font-semibold truncate">
         {pyNode.label}
       </div>
-      <div className="text-emerald-600 text-[10px] mt-0.5">
+      <div className="text-emerald-600 text-[10px] mt-0.5 truncate">
         {basename(pyNode.source_file)}:{pyNode.start_line}
       </div>
       <Handle type="source" position={Position.Bottom} style={{ background: '#34d399', border: '2px solid #0f1117', visibility: isEntry ? 'visible' : 'hidden' }} />

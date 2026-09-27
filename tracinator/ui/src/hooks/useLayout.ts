@@ -1,5 +1,6 @@
 import dagre from '@dagrejs/dagre'
 import { Node, Edge } from '@xyflow/react'
+import { IF_NODE_HEIGHT } from '../components/NodeTypes/shared'
 
 const NODE_WIDTH = 240
 const NODE_HEIGHT = 72
@@ -33,6 +34,7 @@ function estimateWrappedLineCount(label: string): number {
 // overlaps whatever dagre placed in the rank below — this estimates that
 // real height instead of assuming every node is NODE_HEIGHT.
 function estimateNodeHeight(n: Node): number {
+  if (n.type === 'IF' || n.type === 'ELIF') return IF_NODE_HEIGHT
   if (n.type !== 'STATEMENT') return NODE_HEIGHT
   const label = (n.data as { pyNode?: { label?: string } } | undefined)?.pyNode?.label ?? ''
   const extraLines = Math.max(0, estimateWrappedLineCount(label) - 1)
@@ -67,9 +69,11 @@ export function computeLayout(nodes: Node[], edges: Edge[]): Node[] {
     const height = heights.get(n.id) ?? NODE_HEIGHT
     return {
       ...n,
+      // Whole pixels: dagre returns fractional centres (e.g. 123.5), and
+      // text positioned between pixels renders soft in the webview.
       position: {
-        x: pos.x - NODE_WIDTH / 2,
-        y: pos.y - height / 2,
+        x: Math.round(pos.x - NODE_WIDTH / 2),
+        y: Math.round(pos.y - height / 2),
       },
     }
   })
