@@ -19,6 +19,8 @@ import WindowControls from './components/WindowControls'
 import ResizeHandles from './components/ResizeHandles'
 import ResizeDivider from './components/ResizeDivider'
 import { useResizableWidth } from './hooks/useResizableWidth'
+import { inTauri } from './lib/tauri'
+import { restoreProjectRoot } from './lib/projectRoot'
 
 type SourceTab = 'editor' | 'file'
 
@@ -26,6 +28,10 @@ type SourceTab = 'editor' | 'file'
 // /api/config to report a project root — the app is always "ready" and the
 // Local File tab has nothing to talk to.
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
+
+// Only the desktop app gets "Open folder": it has a native folder picker,
+// and its default root (the home folder) is rarely the project you want.
+const CAN_OPEN_FOLDER = !DEMO_MODE && inTauri()
 
 // First-time-only walkthrough of the whole layout — shown once per browser
 // (see MAIN_TOUR_SEEN_KEY below), left off the desktop build since it has its
@@ -171,8 +177,12 @@ export default function App() {
     if (DEMO_MODE) return
     fetch('/api/config')
       .then(r => r.json())
-      .then((cfg: { root?: string }) => {
-        if (cfg.root) setProjectRoot(cfg.root)
+      .then(async (cfg: { root?: string }) => {
+        // The last folder opened with "Open folder" wins over the default;
+        // if it's gone, the server keeps its default root.
+        const restored = CAN_OPEN_FOLDER ? await restoreProjectRoot() : null
+        const root = restored ?? cfg.root
+        if (root) setProjectRoot(root)
       })
       .catch(() => {})
   }, [])
@@ -316,7 +326,12 @@ export default function App() {
         <div className="shrink-0 flex flex-col min-h-0" style={{ width: leftPanel.width }}>
           {DEMO_MODE || sourceTab === 'editor'
             ? <EditorPane onRun={handleEditorRun} loading={loading} />
-            : <FileBrowser root={projectRoot} onSelect={handleFileSelect} onFilesPanelResize={leftPanel.grow} />
+            : <FileBrowser
+                root={projectRoot}
+                onSelect={handleFileSelect}
+                onFilesPanelResize={leftPanel.grow}
+                onRootChange={CAN_OPEN_FOLDER ? setProjectRoot : undefined}
+              />
           }
         </div>
 

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Folder, FileCode, ChevronRight, ArrowLeft, Play, FunctionSquare, Zap,
+  Folder, FolderOpen, FileCode, ChevronRight, ArrowLeft, Play, FunctionSquare, Zap,
 } from 'lucide-react'
 import type { FunctionInfo } from '../types/graph'
 import ResizeDivider from './ResizeDivider'
 import { useResizableWidth } from '../hooks/useResizableWidth'
+import { buildCrumbs, joinPath } from '../lib/paths'
+import { pickFolder, setServerProjectRoot, rememberProjectRoot } from '../lib/projectRoot'
 
 interface BrowseResult {
   path: string
@@ -22,9 +24,13 @@ interface Props {
   // same amount — otherwise widening the files list eats directly into the
   // function list's width instead of pushing the sidebar's outer edge.
   onFilesPanelResize?: (delta: number) => void
+  // Desktop app only: shows the "Open folder" button, and is called with the
+  // new root once the backend has switched to it. The web UI's root is set
+  // by `tracinator ui --root` and has no native folder picker to offer.
+  onRootChange?: (root: string) => void
 }
 
-export default function FileBrowser({ root, onSelect, onFilesPanelResize }: Props) {
+export default function FileBrowser({ root, onSelect, onFilesPanelResize, onRootChange }: Props) {
   const [currentPath, setCurrentPath] = useState<string>(root)
   const [browse, setBrowse] = useState<BrowseResult | null>(null)
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
@@ -58,8 +64,23 @@ export default function FileBrowser({ root, onSelect, onFilesPanelResize }: Prop
     fetchDir(root)
   }, [root, fetchDir])
 
+  const handleOpenFolder = async () => {
+    try {
+      const picked = await pickFolder(root)
+      if (!picked) return
+      const newRoot = await setServerProjectRoot(picked)
+      onRootChange?.(newRoot)
+      // Refetch even when the same folder was picked again, so the listing
+      // jumps back to its top level.
+      fetchDir(newRoot)
+      await rememberProjectRoot(newRoot)
+    } catch (e) {
+      setBrowseError(e instanceof Error ? e.message : 'Could not open that folder')
+    }
+  }
+
   const handleFileClick = (filename: string) => {
-    const fullPath = `${currentPath}/${filename}`
+    const fullPath = joinPath(currentPath, filename)
     setSelectedFile(fullPath)
     setFunctions(null)
     setLoadingFns(true)
@@ -83,6 +104,18 @@ export default function FileBrowser({ root, onSelect, onFilesPanelResize }: Prop
       <div ref={splitContainerRef} className="flex flex-1 min-h-0">
         {/* Left panel — file browser */}
         <div className="flex flex-col shrink-0 min-h-0" style={{ width: filesPanel.width }}>
+          {onRootChange && (
+            <div className="px-2 pt-2 shrink-0">
+              <button
+                onClick={handleOpenFolder}
+                className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border border-indigo-700/60 bg-indigo-900/30 hover:bg-indigo-900/60 text-indigo-200 hover:text-white text-xs font-semibold transition-colors"
+                title="Choose the project folder to browse"
+              >
+                <FolderOpen size={14} className="shrink-0" />
+                Open folder
+              </button>
+            </div>
+          )}
           {/* Breadcrumb */}
           <div className="flex items-center gap-1 px-4 py-2.5 border-b border-gray-800/60 bg-gray-900/40 shrink-0 overflow-x-auto">
             {browse?.parent && (
@@ -128,7 +161,7 @@ export default function FileBrowser({ root, onSelect, onFilesPanelResize }: Prop
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.02 }}
-                    onClick={() => fetchDir(`${currentPath}/${dir}`)}
+                    onClick={() => fetchDir(joinPath(currentPath, dir))}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-800/70 text-left group transition-colors"
                   >
                     <Folder size={15} className="text-indigo-400 shrink-0" />
@@ -141,7 +174,7 @@ export default function FileBrowser({ root, onSelect, onFilesPanelResize }: Prop
 
                 {/* .py files */}
                 {browse.files.map((file, i) => {
-                  const fullPath = `${currentPath}/${file}`
+                  const fullPath = joinPath(currentPath, file)
                   const isSelected = selectedFile === fullPath
                   return (
                     <motion.button
@@ -228,7 +261,7 @@ export default function FileBrowser({ root, onSelect, onFilesPanelResize }: Prop
                   <div className="flex items-center gap-2">
                     <FileCode size={14} className="text-emerald-400" />
                     <span className="text-sm font-mono text-gray-300 truncate">
-                      {selectedFile.split('/').pop()}
+                      {selectedFile.split(/[\\/]/).pop()}
                     </span>
                   </div>
                   <div className="text-xs text-gray-600 mt-0.5">
@@ -280,18 +313,4 @@ export default function FileBrowser({ root, onSelect, onFilesPanelResize }: Prop
       </div>
     </div>
   )
-}
-
-function buildCrumbs(currentPath: string, root: string): { label: string; path: string }[] {
-  const rootParts = root.split('/')
-  const currentParts = currentPath.split('/')
-  const crumbs: { label: string; path: string }[] = []
-
-  for (let i = rootParts.length - 1; i < currentParts.length; i++) {
-    crumbs.push({
-      label: currentParts[i] || '/',
-      path: currentParts.slice(0, i + 1).join('/') || '/',
-    })
-  }
-  return crumbs
 }

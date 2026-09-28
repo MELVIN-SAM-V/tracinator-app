@@ -214,6 +214,27 @@ async def get_config():
     })
 
 
+class ProjectRootRequest(BaseModel):
+    path: str
+
+
+@app.post("/api/project-root")
+async def set_project_root(body: ProjectRootRequest):
+    """Switches the folder the file browser is confined to (and where a
+    traced project's .venv is looked up) — the desktop app's "Open folder"
+    button. Only the root moves; the file/function launch config stays."""
+    global _project_root
+    target = Path(body.path).expanduser().resolve()
+    if not target.is_dir():
+        raise HTTPException(status_code=404, detail=f"Folder not found: {body.path}")
+    _project_root = str(target)
+    _launch_config["root"] = _project_root
+    return JSONResponse(content={
+        "root": _project_root,
+        "python_executable": resolve_python_executable(_project_root),
+    })
+
+
 class PythonExecutableRequest(BaseModel):
     path: str | None = None
 

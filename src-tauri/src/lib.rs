@@ -42,15 +42,25 @@ fn pick_port() -> u16 {
     port
 }
 
-fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("src-tauri has a parent directory")
-        .to_path_buf()
+/// The folder the file browser starts in (the user can switch it with
+/// "Open folder"). Dev builds use this repo, as `tauri dev` always has.
+/// Release builds must not: `CARGO_MANIFEST_DIR` is the *build machine's*
+/// path, baked in at compile time, and on any other PC that folder doesn't
+/// exist, so spawning the backend with it as cwd fails outright.
+fn default_project_root(handle: &AppHandle) -> PathBuf {
+    if cfg!(debug_assertions) {
+        return Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("src-tauri has a parent directory")
+            .to_path_buf();
+    }
+    handle
+        .path()
+        .home_dir()
+        .unwrap_or_else(|_| std::env::temp_dir())
 }
 
-fn spawn_backend(runtime: &ServerRuntime, port: u16) -> std::io::Result<Child> {
-    let root = repo_root();
+fn spawn_backend(runtime: &ServerRuntime, port: u16, root: &Path) -> std::io::Result<Child> {
     let mut cmd = Command::new(&runtime.python);
     // -P (PYTHONSAFEPATH, 3.11+): `-m` normally prepends cwd to sys.path,
     // which would let a *traced project* that happens to contain a
@@ -136,7 +146,8 @@ async fn boot(handle: AppHandle) {
         }
     };
 
-    let child = match spawn_backend(&runtime, port) {
+    let root = default_project_root(&handle);
+    let child = match spawn_backend(&runtime, port, &root) {
         Ok(child) => child,
         Err(e) => {
             fatal(&handle, format!("Failed to start Tracinator's backend: {e}"));
