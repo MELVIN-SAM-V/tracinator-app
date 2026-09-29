@@ -6,6 +6,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -156,6 +157,14 @@ async fn boot(handle: AppHandle) {
     };
     *handle.state::<BackendState>().child.lock().unwrap() = Some(child);
 
+    // The main window must not exist until the backend is listening:
+    // created any earlier, WebView2 renders its own "127.0.0.1 refused to
+    // connect" error page, which can flash up before the real UI loads.
+    if !wait_for_health(port, Instant::now() + HEALTH_TIMEOUT).await {
+        fatal(&handle, "Tracinator's backend didn't start in time.");
+        return;
+    }
+
     let url = format!("http://127.0.0.1:{port}/");
     let main_window = WebviewWindowBuilder::new(
         &handle,
@@ -170,25 +179,21 @@ async fn boot(handle: AppHandle) {
     // WindowControls.tsx), VS Code-style. ResizeHandles.tsx reimplements
     // edge/corner resize, lost along with the OS frame.
     .decorations(false)
+    // Swap splash -> main only once the UI has actually rendered, so the
+    // user never sees a blank/white webview in between.
+    .on_page_load(|window, payload| {
+        if payload.event() == PageLoadEvent::Finished {
+            if let Some(splash) = window.app_handle().get_webview_window("splashscreen") {
+                let _ = splash.close();
+            }
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    })
     .build();
 
-    let main_window = match main_window {
-        Ok(w) => w,
-        Err(e) => {
-            fatal(&handle, format!("Failed to create the main window: {e}"));
-            return;
-        }
-    };
-
-    let deadline = Instant::now() + HEALTH_TIMEOUT;
-    if wait_for_health(port, deadline).await {
-        if let Some(splash) = handle.get_webview_window("splashscreen") {
-            let _ = splash.close();
-        }
-        let _ = main_window.show();
-        let _ = main_window.set_focus();
-    } else {
-        fatal(&handle, "Tracinator's backend didn't start in time.");
+    if let Err(e) = main_window {
+        fatal(&handle, format!("Failed to create the main window: {e}"));
     }
 }
 

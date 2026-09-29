@@ -100,7 +100,18 @@ fn unzip(archive_path: &Path, dest: &Path) -> Result<(), String> {
 /// Runs the bundled interpreter's own pip, offline, against the wheelhouse
 /// zipped alongside it.
 fn install_site_packages(python: &Path, wheelhouse: &Path, target: &Path) -> Result<(), String> {
-    let output = Command::new(python)
+    let mut cmd = Command::new(python);
+
+    // python.exe is a console app, so without this Windows pops a cmd
+    // window over the splash screen for the whole install.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output = cmd
         .arg("-m")
         .arg("pip")
         .arg("install")
