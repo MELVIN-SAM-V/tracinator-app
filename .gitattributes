@@ -2,3 +2,11 @@
 # Windows checkout with core.autocrlf=true) makes `/usr/bin/env bash` fail
 # with "bash\r: No such file or directory".
 *.sh text eol=lf
+
+# Rust/Tauri and config files check out with LF on every OS. On Windows,
+# core.autocrlf=true writes them as CRLF, then tools like the Tauri CLI
+# re-save Cargo.toml with LF, and git flags it as modified with no diff.
+*.toml text eol=lf
+*.lock text eol=lf
+*.rs   text eol=lf
+*.json text eol=lf
