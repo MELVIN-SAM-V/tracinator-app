@@ -1,7 +1,8 @@
 # Desktop release hosting
 
 `releases.tracinator.com` — the S3 + CloudFront bucket that hosts the Tauri
-updater's `latest.json` manifest and signed installers. This is what
+updater's per-platform manifests (`linux-x86_64/latest.json`,
+`windows-x86_64/latest.json`) and signed installers. This is what
 `src-tauri/tauri.conf.json`'s `plugins.updater.endpoints` points at, and
 what `infra/scripts/publish_release.sh` uploads to. **Not yet deployed** —
 `publish_release.sh` has never been run end to end (see its header comment).
@@ -47,8 +48,10 @@ infra/scripts/publish_release.sh
 
 Builds the frontend (non-demo mode) and the signed Tauri bundle for the
 current OS, uploads the installer(s) to `s3://releases.tracinator.com/v$VERSION/`,
-merges the new platform's entry into `latest.json`, and invalidates
-CloudFront for it. Run once per target OS you're releasing for. See the
+writes that platform's own `<platform>/latest.json`, and invalidates
+CloudFront for it. Run once per target OS you're releasing for. Each
+platform's manifest is independent, so publishing one never changes what
+the other platform's users are offered. See the
 script's own header comments for the full sequence and guardrails
 (re-publish protection, etc.).
 

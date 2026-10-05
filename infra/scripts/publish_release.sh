@@ -3,9 +3,12 @@
 # platform only. Tauri installers can't be reliably cross-compiled — on the
 # WSL2 + native Windows dual-boot setup this machine has, run this once
 # from each side to cover both platforms.
-# Merges into the existing releases.tracinator.com/latest.json instead of
-# overwriting it, so publishing from one platform never wipes out the
-# other's entry.
+# Each platform has its own manifest, $PLATFORM_KEY/latest.json, matching
+# the {{target}}-{{arch}} endpoint in tauri.conf.json's
+# plugins.updater.endpoints. A run only ever writes its own platform's
+# manifest. A shared manifest would have a single top-level "version" for
+# every platform, so publishing one platform first would offer the other's
+# users a version whose entry still pointed at their old installer.
 #
 # NOT YET RUN END TO END — infra/environments/releases hasn't been applied
 # yet, and this hasn't been exercised against a real build. Written to the
@@ -75,43 +78,40 @@ aws s3 cp "$BUNDLE_DIR" "s3://$BUCKET/$RELEASE_PREFIX/" --recursive --exclude "*
   --include "*.tar.gz" --include "*.tar.gz.sig" \
   --include "*.zip" --include "*.zip.sig"
 
+MANIFEST_KEY="$PLATFORM_KEY/latest.json"
 MANIFEST_TMP="$(mktemp)"
 trap 'rm -f "$MANIFEST_TMP"' EXIT
 
-if aws s3 cp "s3://$BUCKET/latest.json" "$MANIFEST_TMP" 2>/dev/null; then
-  echo "==> Merging into existing latest.json"
-else
-  echo "==> No existing latest.json — starting a fresh manifest"
-  echo '{"version":"","notes":"","pub_date":"","platforms":{}}' > "$MANIFEST_TMP"
-fi
-
-UPDATED_MANIFEST="$(mktemp)"
+# Written fresh every time, never merged: this manifest only ever describes
+# this platform's newest release.
 # Passed as env vars rather than interpolated into the JS source directly —
 # SIGNATURE in particular shouldn't be pasted into a script string just
 # because it happens to be base64 today.
-MANIFEST_IN="$MANIFEST_TMP" MANIFEST_OUT="$UPDATED_MANIFEST" VERSION="$VERSION" \
+MANIFEST_OUT="$MANIFEST_TMP" VERSION="$VERSION" \
 PLATFORM_KEY="$PLATFORM_KEY" SIGNATURE="$SIGNATURE" \
 ARTIFACT_URL="https://$BUCKET/$ARTIFACT_KEY" \
 node -e '
 const fs = require("fs");
-const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST_IN, "utf8"));
-manifest.version = process.env.VERSION;
-manifest.pub_date = new Date().toISOString();
-manifest.platforms = manifest.platforms || {};
-manifest.platforms[process.env.PLATFORM_KEY] = {
-  signature: process.env.SIGNATURE,
-  url: process.env.ARTIFACT_URL,
+const manifest = {
+  version: process.env.VERSION,
+  notes: "",
+  pub_date: new Date().toISOString(),
+  platforms: {
+    [process.env.PLATFORM_KEY]: {
+      signature: process.env.SIGNATURE,
+      url: process.env.ARTIFACT_URL,
+    },
+  },
 };
 fs.writeFileSync(process.env.MANIFEST_OUT, JSON.stringify(manifest, null, 2));
 '
 
-echo "==> Publishing latest.json"
-aws s3 cp "$UPDATED_MANIFEST" "s3://$BUCKET/latest.json"
-rm -f "$UPDATED_MANIFEST"
+echo "==> Publishing $MANIFEST_KEY"
+aws s3 cp "$MANIFEST_TMP" "s3://$BUCKET/$MANIFEST_KEY"
 
-echo "==> Invalidating CloudFront cache for /latest.json"
+echo "==> Invalidating CloudFront cache for /$MANIFEST_KEY"
 aws cloudfront create-invalidation \
   --distribution-id "$RELEASES_CLOUDFRONT_DISTRIBUTION_ID" \
-  --paths "/latest.json"
+  --paths "/$MANIFEST_KEY"
 
 echo "Published $VERSION for $PLATFORM_KEY."

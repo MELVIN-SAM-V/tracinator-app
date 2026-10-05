@@ -39,7 +39,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc5QjQwOTZCMzZCQjVFQzIKUldUQ1hyczJhd20wZVp0SGxkdFJsdCttVVF5V1hVYkoyRFJMdllETUpFS2x2RGx0K2ZXL1Q0bG8K",
       "endpoints": [
-        "https://releases.tracinator.com/latest.json"
+        "https://releases.tracinator.com/{{target}}-{{arch}}/latest.json"
       ]
     }
   }

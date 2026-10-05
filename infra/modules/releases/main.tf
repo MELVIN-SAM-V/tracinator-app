@@ -1,4 +1,5 @@
-# Static hosting for the desktop app's update manifest (latest.json) and
+# Static hosting for the desktop app's per-platform update manifests
+# (<platform>/latest.json) and
 # installer files — what tauri-plugin-updater's check() fetches (see
 # src-tauri/tauri.conf.json's plugins.updater.endpoints and
 # infra/scripts/publish_release.sh, which is what actually uploads here).
@@ -67,8 +68,8 @@ resource "aws_cloudfront_distribution" "this" {
     cached_methods         = ["GET", "HEAD"]
     target_origin_id       = "s3-releases"
     viewer_protocol_policy = "redirect-to-https"
-    # AWS managed: CachingOptimized. latest.json changes on every release —
-    # publish_release.sh invalidates /latest.json on each publish rather
+    # AWS managed: CachingOptimized. The manifests change on every release —
+    # publish_release.sh invalidates /<platform>/latest.json on each publish rather
     # than relying on a short TTL, so this can stay the same
     # bandwidth-friendly policy the installers themselves benefit from.
     cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
