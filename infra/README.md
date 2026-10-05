@@ -72,8 +72,9 @@ endpoint, so `tauri.conf.json` stays pointed at production.
    The updater only updates an AppImage on Linux (run it directly, not the
    `.deb`) and the NSIS `-setup.exe` on Windows:
    ```
-   cd tracinator/ui && npm run build && \
-   TAURI_SIGNING_PRIVATE_KEY=... npx tauri build --config ../../src-tauri/tauri.test.conf.json
+   (cd tracinator/ui && npm run build)
+   TAURI_SIGNING_PRIVATE_KEY=... \
+   tracinator/ui/node_modules/.bin/tauri build --config src-tauri/tauri.test.conf.json
    ```
    Copy the installer somewhere else before the next step's build, and
    delete `src-tauri/target/release/bundle`, so the publish step can't pick

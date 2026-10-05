@@ -52,7 +52,7 @@ echo "==> Building frontend"
 echo "==> Building + signing the desktop app ($PLATFORM_KEY)"
 TAURI_BUILD_ARGS=()
 if [ -n "${TAURI_EXTRA_CONFIG:-}" ]; then
-  # Resolved now, since the build runs from tracinator/ui and a relative
+  # Resolved now, since the build runs from the repo root and a relative
   # path would otherwise point somewhere else.
   EXTRA_CONFIG_PATH="$(cd "$(dirname "$TAURI_EXTRA_CONFIG")" && pwd)/$(basename "$TAURI_EXTRA_CONFIG")"
   [ -f "$EXTRA_CONFIG_PATH" ] || { echo "TAURI_EXTRA_CONFIG not found: $TAURI_EXTRA_CONFIG" >&2; exit 1; }
@@ -65,7 +65,12 @@ if [ -n "${TAURI_EXTRA_CONFIG:-}" ]; then
   echo "==> Merging $TAURI_EXTRA_CONFIG over tauri.conf.json"
   TAURI_BUILD_ARGS+=(--config "$EXTRA_CONFIG_PATH")
 fi
-(cd "$REPO_ROOT/tracinator/ui" && npx tauri build "${TAURI_BUILD_ARGS[@]}")
+# Run from the repo root: the Tauri CLI only searches the current folder and
+# below for src-tauri/tauri.conf.json, so starting it from tracinator/ui
+# fails with "Couldn't recognize the current folder as a Tauri project".
+# The CLI is installed only in tracinator/ui/node_modules, so it's called by
+# path rather than through npx.
+(cd "$REPO_ROOT" && tracinator/ui/node_modules/.bin/tauri build "${TAURI_BUILD_ARGS[@]}")
 
 VERSION="$(node -p "require('$REPO_ROOT/src-tauri/tauri.conf.json').version")"
 BUNDLE_DIR="$REPO_ROOT/src-tauri/target/release/bundle"
