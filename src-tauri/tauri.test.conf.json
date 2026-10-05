@@ -1,0 +1,9 @@
+{
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://releases-test.tracinator.com/{{target}}-{{arch}}/latest.json"
+      ]
+    }
+  }
+}

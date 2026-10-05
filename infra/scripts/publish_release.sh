@@ -23,10 +23,19 @@
 # - RELEASES_CLOUDFRONT_DISTRIBUTION_ID — the cloudfront_distribution_id
 #   output from infra/environments/releases, once that has been applied.
 # - AWS credentials for the same account as the rest of infra/.
+#
+# Optional, for a throwaway test stack (see infra/README.md, "Testing a
+# release end to end"):
+# - RELEASES_BUCKET — defaults to releases.tracinator.com. The bucket is
+#   named after its domain, so this also sets the installer URLs written
+#   into the manifest.
+# - TAURI_EXTRA_CONFIG — a Tauri config file merged over tauri.conf.json at
+#   build time (`tauri build --config`), e.g. src-tauri/tauri.test.conf.json
+#   to point the built app's updater at the test stack instead of production.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-BUCKET="releases.tracinator.com"
+BUCKET="${RELEASES_BUCKET:-releases.tracinator.com}"
 
 : "${TAURI_SIGNING_PRIVATE_KEY:?Set this or TAURI_SIGNING_PRIVATE_KEY_PATH — see \`npx tauri signer generate\`}"
 : "${RELEASES_CLOUDFRONT_DISTRIBUTION_ID:?Set this to the cloudfront_distribution_id output from infra/environments/releases}"
@@ -41,7 +50,22 @@ echo "==> Building frontend"
 (cd "$REPO_ROOT/tracinator/ui" && npm run build)
 
 echo "==> Building + signing the desktop app ($PLATFORM_KEY)"
-(cd "$REPO_ROOT/tracinator/ui" && npx tauri build)
+TAURI_BUILD_ARGS=()
+if [ -n "${TAURI_EXTRA_CONFIG:-}" ]; then
+  # Resolved now, since the build runs from tracinator/ui and a relative
+  # path would otherwise point somewhere else.
+  EXTRA_CONFIG_PATH="$(cd "$(dirname "$TAURI_EXTRA_CONFIG")" && pwd)/$(basename "$TAURI_EXTRA_CONFIG")"
+  [ -f "$EXTRA_CONFIG_PATH" ] || { echo "TAURI_EXTRA_CONFIG not found: $TAURI_EXTRA_CONFIG" >&2; exit 1; }
+  # VERSION below is read from tauri.conf.json alone, so an override that
+  # changed it would publish a manifest that disagrees with the build.
+  if node -e 'process.exit("version" in require(process.argv[1]) ? 0 : 1)' "$EXTRA_CONFIG_PATH"; then
+    echo "$TAURI_EXTRA_CONFIG sets \"version\" — set it in src-tauri/tauri.conf.json instead." >&2
+    exit 1
+  fi
+  echo "==> Merging $TAURI_EXTRA_CONFIG over tauri.conf.json"
+  TAURI_BUILD_ARGS+=(--config "$EXTRA_CONFIG_PATH")
+fi
+(cd "$REPO_ROOT/tracinator/ui" && npx tauri build "${TAURI_BUILD_ARGS[@]}")
 
 VERSION="$(node -p "require('$REPO_ROOT/src-tauri/tauri.conf.json').version")"
 BUNDLE_DIR="$REPO_ROOT/src-tauri/target/release/bundle"

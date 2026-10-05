@@ -1,5 +1,5 @@
 output "releases_url" {
-  value = "https://releases.${var.domain_name}"
+  value = "https://${var.subdomain}.${var.domain_name}"
 }
 
 output "cloudfront_distribution_id" {

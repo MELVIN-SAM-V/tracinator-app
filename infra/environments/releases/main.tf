@@ -20,7 +20,7 @@ provider "aws" {
 }
 
 locals {
-  full_domain = "releases.${var.domain_name}"
+  full_domain = "${var.subdomain}.${var.domain_name}"
 }
 
 # Not module.dns — that creates a *new* hosted zone, and demo's already owns

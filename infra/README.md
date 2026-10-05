@@ -55,6 +55,51 @@ the other platform's users are offered. See the
 script's own header comments for the full sequence and guardrails
 (re-publish protection, etc.).
 
+## Testing a release end to end
+
+A throwaway copy of the stack at `releases-test.tracinator.com`, kept in its
+own Terraform workspace so it never touches production's state. Builds made
+for it use `src-tauri/tauri.test.conf.json`, which only swaps the updater
+endpoint, so `tauri.conf.json` stays pointed at production.
+
+1. From `infra/`, deploy the test stack and note its `cloudfront_distribution_id`:
+   ```
+   terraform -chdir=environments/releases workspace new test
+   terraform -chdir=environments/releases apply -var subdomain=releases-test
+   ```
+2. From the repo root, build and install the "old" version with the test
+   config. Signing is required here too (`createUpdaterArtifacts` is on).
+   The updater only updates an AppImage on Linux (run it directly, not the
+   `.deb`) and the NSIS `-setup.exe` on Windows:
+   ```
+   cd tracinator/ui && npm run build && \
+   TAURI_SIGNING_PRIVATE_KEY=... npx tauri build --config ../../src-tauri/tauri.test.conf.json
+   ```
+   Copy the installer somewhere else before the next step's build, and
+   delete `src-tauri/target/release/bundle`, so the publish step can't pick
+   up this older build's files.
+3. From the repo root, bump `version` in `src-tauri/tauri.conf.json` and
+   publish to the test stack:
+   ```
+   RELEASES_BUCKET=releases-test.tracinator.com                  \
+   RELEASES_CLOUDFRONT_DISTRIBUTION_ID=<test distribution id>     \
+   TAURI_EXTRA_CONFIG=src-tauri/tauri.test.conf.json              \
+   TAURI_SIGNING_PRIVATE_KEY=...                                  \
+   infra/scripts/publish_release.sh
+   ```
+4. Launch the installed old version: it should offer the update, and
+   "Restart to update" should come back on the new version.
+5. From `infra/`, tear down. The bucket must be emptied first, since
+   Terraform won't delete a non-empty one. Then switch back so later
+   applies hit production:
+   ```
+   aws s3 rm s3://releases-test.tracinator.com --recursive
+   terraform -chdir=environments/releases destroy -var subdomain=releases-test
+   terraform -chdir=environments/releases workspace select default
+   terraform -chdir=environments/releases workspace delete test
+   ```
+   Then revert the `version` bump.
+
 ## Building the bundled runtime
 
 ```
