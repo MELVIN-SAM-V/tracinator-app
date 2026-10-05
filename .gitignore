@@ -37,3 +37,6 @@ infra/**/tfplan
 infra/**/.terraform.tfstate.lock.info
 
 infra/.env
+
+# Personal scratch notes on current work (not for the repo)
+/progress.md
