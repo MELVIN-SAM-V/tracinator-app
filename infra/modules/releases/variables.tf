@@ -15,3 +15,15 @@ variable "certificate_arn" {
 variable "bucket_name" {
   type = string
 }
+
+variable "download_rate_limit" {
+  description = "Non-manifest requests (installer downloads, in practice) allowed per IP within download_rate_window_sec before WAF blocks that IP. AWS's minimum is 10."
+  type        = number
+  default     = 10
+}
+
+variable "download_rate_window_sec" {
+  description = "Rolling window for download_rate_limit. AWS allows 60, 120, 300 or 600."
+  type        = number
+  default     = 300
+}

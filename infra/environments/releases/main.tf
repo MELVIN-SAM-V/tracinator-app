@@ -42,7 +42,11 @@ module "acm" {
 }
 
 module "releases" {
-  source          = "../../modules/releases"
+  source = "../../modules/releases"
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
   domain_name     = local.full_domain
   zone_id         = data.aws_route53_zone.root.zone_id
   certificate_arn = module.acm.certificate_arn

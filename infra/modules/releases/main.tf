@@ -5,11 +5,22 @@
 # infra/scripts/publish_release.sh, which is what actually uploads here).
 #
 # Deliberately much simpler than ../frontend: no SPA routing (there's no
-# app here, just files), no API origin, and no WAF. Traffic here is one
-# small check() request per app launch plus occasional installer/manifest
-# downloads — nowhere near the abuse surface ../frontend's WAF exists for
-# (a public, unauthenticated demo API). Add a WAF later if that stops
-# being true; not a gap to silently paper over, just not needed yet.
+# app here, just files) and no API origin. The one WAF rule below exists
+# because this domain is published in an open-source repo: the cost risk
+# isn't compute but bandwidth, from a script downloading the ~35 MB
+# installers in a loop. The manifests are left unlimited so normal update
+# checks can never be blocked.
+
+# The WAF web ACL for a CloudFront distribution must live in us-east-1,
+# same requirement as the ACM cert.
+terraform {
+  required_providers {
+    aws = {
+      source                = "hashicorp/aws"
+      configuration_aliases = [aws.us_east_1]
+    }
+  }
+}
 
 resource "aws_s3_bucket" "releases" {
   bucket = var.bucket_name
@@ -53,9 +64,85 @@ resource "aws_s3_bucket_policy" "releases" {
   policy = data.aws_iam_policy_document.bucket_policy.json
 }
 
+locals {
+  # WAFv2 name/metric_name only allow alphanumeric, hyphen, underscore —
+  # bucket_name is a domain and contains dots.
+  waf_name = replace(var.bucket_name, ".", "-")
+}
+
+resource "aws_wafv2_web_acl" "this" {
+  provider    = aws.us_east_1
+  name        = "${local.waf_name}-waf"
+  description = "Rate-limits per-IP installer downloads to bound bandwidth cost from scripted abuse."
+  scope       = "CLOUDFRONT"
+
+  # AWS refuses to delete a web ACL still attached to a distribution, so a
+  # replacement must be created and attached before the old one goes.
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  default_action {
+    allow {}
+  }
+
+  rule {
+    name     = "installer-download-rate-limit"
+    priority = 1
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        limit                 = var.download_rate_limit
+        evaluation_window_sec = var.download_rate_window_sec
+        aggregate_key_type    = "IP"
+
+        # Counts every request except the manifests, rather than matching
+        # installer paths, so it keeps covering installers if their layout
+        # under v<version>/ ever changes.
+        scope_down_statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string         = "/latest.json"
+                positional_constraint = "ENDS_WITH"
+
+                field_to_match {
+                  uri_path {}
+                }
+
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.waf_name}-download-rate-limit"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "${local.waf_name}-waf"
+    sampled_requests_enabled   = true
+  }
+}
+
 resource "aws_cloudfront_distribution" "this" {
-  enabled = true
-  aliases = [var.domain_name]
+  enabled    = true
+  aliases    = [var.domain_name]
+  web_acl_id = aws_wafv2_web_acl.this.arn
 
   origin {
     domain_name              = aws_s3_bucket.releases.bucket_regional_domain_name
