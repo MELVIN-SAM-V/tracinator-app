@@ -90,7 +90,52 @@ fn spawn_backend(runtime: &ServerRuntime, port: u16, root: &Path) -> std::io::Re
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    cmd.spawn()
+    let child = cmd.spawn()?;
+    #[cfg(windows)]
+    tie_to_app_lifetime(&child);
+    Ok(child)
+}
+
+/// Puts the backend (and anything it spawns, like the traced code's
+/// interpreter) in a Job Object that kills its members once the job's last
+/// handle closes, i.e. when this process ends however it ends. Some exits
+/// skip `shutdown_backend`: the updater's install step launches the
+/// installer and then calls `std::process::exit(0)` directly. The orphaned
+/// backend kept the runtime folder's python.exe in use, so the updated
+/// app's bootstrap couldn't replace that folder and failed with "Access is
+/// denied" on every launch. The job handle is deliberately never closed,
+/// since closing it would kill the backend.
+#[cfg(windows)]
+fn tie_to_app_lifetime(child: &Child) {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+
+    unsafe {
+        let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+        if job.is_null() {
+            log::warn!("CreateJobObjectW failed; the backend may outlive the app on a hard exit");
+            return;
+        }
+        let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        let configured = SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            &info as *const _ as *const core::ffi::c_void,
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        ) != 0;
+        if !configured || AssignProcessToJobObject(job, child.as_raw_handle() as HANDLE) == 0 {
+            log::warn!(
+                "couldn't put the backend in a kill-on-close job; it may outlive the app on a hard exit"
+            );
+            CloseHandle(job);
+        }
+    }
 }
 
 async fn get(port: u16, path: &str) -> Option<String> {

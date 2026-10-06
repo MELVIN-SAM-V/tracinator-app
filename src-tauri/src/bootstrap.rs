@@ -133,6 +133,25 @@ fn install_site_packages(python: &Path, wheelhouse: &Path, target: &Path) -> Res
     Ok(())
 }
 
+/// Windows refuses to delete a file a running process has open: "Access is
+/// denied" (os error 5) for a running .exe or loaded DLL, a sharing
+/// violation (os error 32) for other open files. Here that almost always
+/// means an older Tracinator backend is still running from this folder, so
+/// say that instead of surfacing the bare OS error.
+fn describe_runtime_removal_error(e: &std::io::Error, runtime_dir: &Path) -> String {
+    let in_use = cfg!(windows)
+        && (e.kind() == std::io::ErrorKind::PermissionDenied || e.raw_os_error() == Some(32));
+    if !in_use {
+        return e.to_string();
+    }
+    format!(
+        "an older Tracinator process is still running and has files open in {}. \
+         Close any python.exe running from that folder in Task Manager, or restart \
+         your PC, then open Tracinator again. ({e})",
+        runtime_dir.display()
+    )
+}
+
 /// Ensures a private, bundled Python + tracinator's own deps are ready to
 /// run. Downloads nothing at runtime — everything comes from the resource
 /// archive baked into the app bundle at build time. Skipped entirely (after
@@ -178,7 +197,8 @@ pub async fn ensure_server_runtime(handle: &AppHandle) -> Result<ServerRuntime, 
         let site_packages = site_packages.clone();
         tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
             if runtime_dir.exists() {
-                fs::remove_dir_all(&runtime_dir).map_err(|e| e.to_string())?;
+                fs::remove_dir_all(&runtime_dir)
+                    .map_err(|e| describe_runtime_removal_error(&e, &runtime_dir))?;
             }
             fs::create_dir_all(&runtime_dir).map_err(|e| e.to_string())?;
             unzip(&resource_path, &runtime_dir)?;
