@@ -72,7 +72,10 @@ fi
 # path rather than through npx.
 (cd "$REPO_ROOT" && tracinator/ui/node_modules/.bin/tauri build "${TAURI_BUILD_ARGS[@]}")
 
-VERSION="$(node -p "require('$REPO_ROOT/src-tauri/tauri.conf.json').version")"
+# Relative, not "$REPO_ROOT/...": in Git Bash that's a /c/... path, and
+# Git Bash doesn't convert paths embedded in a JS string, so Windows Node
+# can't resolve it. This means the script must be run from the repo root.
+VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
 BUNDLE_DIR="$REPO_ROOT/src-tauri/target/release/bundle"
 
 # Tauri only emits a .sig next to the specific bundle format its updater
