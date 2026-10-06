@@ -92,7 +92,10 @@ ARTIFACT_FILE="${SIG_FILE%.sig}"
 SIGNATURE="$(cat "$SIG_FILE")"
 
 RELEASE_PREFIX="v${VERSION}"
-ARTIFACT_KEY="${RELEASE_PREFIX}/$(basename "$ARTIFACT_FILE")"
+# Keeps the bundle subfolder (nsis/, appimage/), because the recursive
+# upload below does too. A bare basename here pointed the manifest at a
+# key that was never uploaded, so the update download got a 403.
+ARTIFACT_KEY="${RELEASE_PREFIX}/${ARTIFACT_FILE#"$BUNDLE_DIR"/}"
 
 # Guards against re-running with a forgotten version bump, which would
 # silently overwrite this platform's already-published artifacts for this
@@ -142,7 +145,10 @@ echo "==> Publishing $MANIFEST_KEY"
 aws s3 cp "$MANIFEST_TMP" "s3://$BUCKET/$MANIFEST_KEY"
 
 echo "==> Invalidating CloudFront cache for /$MANIFEST_KEY"
-aws cloudfront create-invalidation \
+# MSYS_NO_PATHCONV: otherwise Git Bash rewrites the /-prefixed path into a
+# Windows path (C:/Program Files/Git/...), which CloudFront rejects as an
+# invalid invalidation path. No effect outside Git Bash.
+MSYS_NO_PATHCONV=1 aws cloudfront create-invalidation \
   --distribution-id "$RELEASES_CLOUDFRONT_DISTRIBUTION_ID" \
   --paths "/$MANIFEST_KEY"
 
