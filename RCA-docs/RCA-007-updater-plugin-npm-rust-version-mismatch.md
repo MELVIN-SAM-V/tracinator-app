@@ -3,8 +3,9 @@
 | | |
 |---|---|
 | **Date** | 2026-09-24 |
-| **Severity** | Medium (no release builds possible; running installs unaffected) |
+| **Severity** | Medium (no release builds possible; nothing had been released yet) |
 | **Category** | Build / dependency management |
+| **Caught** | Pre-production (before the first desktop release) |
 | **Status** | Resolved |
 | **Component** | `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `tracinator/ui/package.json`, `tracinator/ui/package-lock.json` |
 
@@ -14,7 +15,7 @@
 
 ## Impact
 
-No installers could be produced until the fix landed. Users already running the app were unaffected: auto-updates are served from `https://releases.tracinator.com/latest.json`, not from the build machine.
+No installers could be produced until the fix landed. No users were affected: the desktop app had not been released yet, so there were no installs to update.
 
 ## Detection
 

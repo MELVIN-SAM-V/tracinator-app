@@ -5,6 +5,7 @@
 | **Date** | 2026-07-31 |
 | **Severity** | High (an entire class of Python code could not be traced) |
 | **Category** | Functional defect / unsupported case treated as supported |
+| **Caught** | Pre-production (during development, before any release) |
 | **Status** | Resolved |
 | **Original doc** | `docs/phase3.4-class-method-support.md` |
 

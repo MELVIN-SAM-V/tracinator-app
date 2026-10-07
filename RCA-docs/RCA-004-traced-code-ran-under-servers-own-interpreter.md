@@ -5,6 +5,7 @@
 | **Date** | 2026-08-15 |
 | **Severity** | High (would have broken tracing of any real project in the desktop app) |
 | **Category** | Design flaw / environment coupling |
+| **Caught** | Pre-production (during desktop installer design, before any release) |
 | **Status** | Resolved |
 | **Original doc** | `docs/deployment.md` |
 

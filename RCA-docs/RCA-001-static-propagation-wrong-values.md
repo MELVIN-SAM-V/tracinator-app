@@ -5,6 +5,7 @@
 | **Date** | 2026-07-22 |
 | **Severity** | High (correctness — the tool's core promise is showing what the code really did) |
 | **Category** | Correctness / design flaw |
+| **Caught** | Pre-production (during development, before any release) |
 | **Status** | Resolved — replaced by runtime tracing |
 | **Original doc** | `docs/phase3.2.md`, `docs/phase3.1-patches.md` |
 

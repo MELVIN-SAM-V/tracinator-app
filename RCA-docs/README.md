@@ -2,17 +2,20 @@
 
 One document per significant defect, vulnerability or security change, with the root cause, the fix, and the lessons. Routine UI tweaks and feature work are not recorded here.
 
-| ID | Title | Category | Severity | Status |
-|---|---|---|---|---|
-| [RCA-001](RCA-001-static-propagation-wrong-values.md) | Static value propagation showed wrong, misleading variable values | Correctness | High | Resolved |
-| [RCA-002](RCA-002-method-tracing-always-crashed.md) | Tracing any class method always crashed | Functional | High | Resolved |
-| [RCA-003](RCA-003-same-named-methods-silently-collided.md) | Same-named methods on different classes silently collided | Correctness | High | Resolved |
-| [RCA-004](RCA-004-traced-code-ran-under-servers-own-interpreter.md) | User code was executed by the server's own Python interpreter | Design | High | Resolved |
-| [RCA-005](RCA-005-demo-cross-request-code-execution-via-shared-temp-dir.md) | Demo: one visitor's leftover files could run inside another visitor's request | Security | Medium | Resolved |
-| [RCA-006](RCA-006-demo-cloud-credentials-readable-by-untrusted-code.md) | Demo: untrusted snippets could read the server's cloud credentials | Security | Medium | Resolved |
-| [RCA-007](RCA-007-updater-plugin-npm-rust-version-mismatch.md) | Release build blocked by an npm/Rust version mismatch in the updater plugin | Build | Medium | Resolved |
+| ID | Title | Category | Severity | Caught | Status |
+|---|---|---|---|---|---|
+| [RCA-001](RCA-001-static-propagation-wrong-values.md) | Static value propagation showed wrong, misleading variable values | Correctness | High | Pre-production | Resolved |
+| [RCA-002](RCA-002-method-tracing-always-crashed.md) | Tracing any class method always crashed | Functional | High | Pre-production | Resolved |
+| [RCA-003](RCA-003-same-named-methods-silently-collided.md) | Same-named methods on different classes silently collided | Correctness | High | Pre-production | Resolved |
+| [RCA-004](RCA-004-traced-code-ran-under-servers-own-interpreter.md) | User code was executed by the server's own Python interpreter | Design | High | Pre-production | Resolved |
+| [RCA-005](RCA-005-demo-cross-request-code-execution-via-shared-temp-dir.md) | Demo: one visitor's leftover files could run inside another visitor's request | Security | Medium | Pre-production | Resolved |
+| [RCA-006](RCA-006-demo-cloud-credentials-readable-by-untrusted-code.md) | Demo: untrusted snippets could read the server's cloud credentials | Security | Medium | Pre-production | Resolved |
+| [RCA-007](RCA-007-updater-plugin-npm-rust-version-mismatch.md) | Release build blocked by an npm/Rust version mismatch in the updater plugin | Build | Medium | Pre-production | Resolved |
+| [RCA-008](RCA-008-local-backend-drivable-by-any-web-page.md) | Local backend could be driven by any web page via DNS rebinding | Security | High | After release (0.1.0) | Resolved in 0.1.1 |
 
 RCA-001 to RCA-004 were extracted from the project's earlier design and review docs. RCA-005 and RCA-006 come from the 2026-09-20 security sweep.
+
+RCA-001 to RCA-007 were all caught before production: before the first desktop release, and for the demo issues before the public demo launched. RCA-008 is the first one found after a release: desktop 0.1.0 shipped with it on 2026-10-06, and 0.1.1 fixes it.
 
 Two further RCAs, on a now-removed licensing feature (license-key disclosure via machine fingerprint, and forgeable local license state), were dropped from this index along with the feature itself rather than kept as historical entries.
 
@@ -27,7 +30,7 @@ Two further RCAs, on a now-removed licensing feature (license-key disclosure via
 
 ```
 # RCA-NNN — Title
-| Date | Severity | Category | Status | Component/Original doc |
+| Date | Severity | Category | Caught (pre-production / after release) | Status | Component/Original doc |
 ## Summary
 ## Impact
 ## Detection

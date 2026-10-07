@@ -5,6 +5,7 @@
 | **Date** | 2026-09-20 |
 | **Severity** | Medium (confirmed locally; limited by the role's permissions) |
 | **Category** | Sensitive data exposure / sandbox weakness |
+| **Caught** | Pre-production (before the public demo launched) |
 | **Status** | Resolved |
 | **Component** | `tracinator/server/demo_app.py`, `tracinator/tracer/event_tracer.py`, `tracinator/server/sandbox_guard.py` |
 

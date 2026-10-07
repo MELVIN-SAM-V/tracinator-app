@@ -5,6 +5,7 @@
 | **Date** | 2026-09-20 |
 | **Severity** | Medium (confirmed locally; the cloud impact follows from documented Lambda `/tmp` reuse and was not tested on the live service) |
 | **Category** | Isolation failure / cross-tenant contamination |
+| **Caught** | Pre-production (before the public demo launched) |
 | **Status** | Resolved |
 | **Component** | `tracinator/server/demo_app.py`, `tracinator/tracer/event_tracer.py` |
 
