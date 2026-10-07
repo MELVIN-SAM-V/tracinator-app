@@ -1,6 +1,6 @@
 [package]
 name = "tracinator-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "Tracinator desktop shell"
 authors = ["Tracinator contributors"]
 license = "MIT"
