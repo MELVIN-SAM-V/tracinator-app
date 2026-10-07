@@ -6,7 +6,9 @@ from fastapi.testclient import TestClient
 
 from tracinator.server.app import app
 
-client = TestClient(app)
+# 127.0.0.1, not TestClient's default "testserver": app.py only accepts
+# local Host headers (TrustedHostMiddleware, the DNS-rebinding guard).
+client = TestClient(app, base_url="http://127.0.0.1")
 
 FUNCTIONS_FILE = str(Path(__file__).parent.parent / "testing" / "01_basic_flow" / "functions.py")
 BUGGY_FILE = str(Path(__file__).parent.parent / "testing" / "03_error_case" / "buggy.py")

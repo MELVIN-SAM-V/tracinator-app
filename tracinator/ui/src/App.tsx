@@ -14,6 +14,7 @@ import VariablePanel from './components/VariablePanel/VariablePanel'
 import Onboarding, { type TourStep } from './components/Onboarding'
 import DemoGuideModal from './components/DemoGuideModal'
 import UpdateBanner from './components/UpdateBanner'
+import { apiFetch } from './lib/api'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import WindowControls from './components/WindowControls'
 import ResizeHandles from './components/ResizeHandles'
@@ -111,6 +112,9 @@ export default function App() {
   }, [])
   const [showGuide, setShowGuide] = useState(false)
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null)
+  // The backend rejected the session token (see lib/api.ts) — nothing else
+  // will work, so say why up front instead of every panel failing on its own.
+  const [sessionRejected, setSessionRejected] = useState<string | null>(null)
   // Remembers the last args a trace was run with, so editing code (which reloads the
   // graph under a new temp file each time) can re-run the trace automatically instead
   // of losing it and making the user re-type the same values.
@@ -175,8 +179,15 @@ export default function App() {
 
   useEffect(() => {
     if (DEMO_MODE) return
-    fetch('/api/config')
-      .then(r => r.json())
+    apiFetch('/api/config')
+      .then(async r => {
+        if (r.status === 401) {
+          const body = await r.json().catch(() => ({}))
+          setSessionRejected(typeof body.detail === 'string' ? body.detail : 'Missing or invalid session token.')
+          throw new Error('session rejected')
+        }
+        return r.json()
+      })
       .then(async (cfg: { root?: string }) => {
         // The last folder opened with "Open folder" wins over the default;
         // if it's gone, the server keeps its default root.
@@ -288,6 +299,11 @@ export default function App() {
       <ResizeHandles />
 
       {availableUpdate && <UpdateBanner update={availableUpdate} />}
+      {sessionRejected && (
+        <div className="shrink-0 bg-red-950/60 border-b border-red-800/50 px-3 py-1.5 text-xs text-center text-red-200">
+          {sessionRejected}
+        </div>
+      )}
 
       {/* Global top bar — data-tauri-drag-region makes its empty space
           window-draggable in the desktop build; WindowControls' buttons are

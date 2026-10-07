@@ -23,18 +23,25 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Same per-launch token the desktop app and `tracinator ui` use (see
+# require_api_token in app.py). Passed only to the backend's environment;
+# the frontend picks it up from ?token= in the link printed below.
+API_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+
 # app.py's file browser defaults to its own cwd at import time (see
 # _project_root in tracinator/server/app.py) — cd here first so it defaults
 # to browsing the whole repo instead of wherever this script happened to be
 # invoked from.
 cd "$REPO_ROOT"
-"$REPO_ROOT/.venv/bin/uvicorn" tracinator.server.app:app --reload --port "$BACKEND_PORT" &
+TRACINATOR_API_TOKEN="$API_TOKEN" \
+  "$REPO_ROOT/.venv/bin/uvicorn" tracinator.server.app:app --reload --port "$BACKEND_PORT" &
 BACKEND_PID=$!
 
 until curl -sf "http://localhost:$BACKEND_PORT/docs" >/dev/null 2>&1; do
   sleep 0.5
 done
 echo "Backend up on :$BACKEND_PORT"
+echo "Open http://localhost:5173/?token=$API_TOKEN"
 
 cd "$REPO_ROOT/tracinator/ui"
 npm run dev

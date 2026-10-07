@@ -8,6 +8,7 @@ import ResizeDivider from './ResizeDivider'
 import { useResizableWidth } from '../hooks/useResizableWidth'
 import { buildCrumbs, joinPath } from '../lib/paths'
 import { pickFolder, setServerProjectRoot, rememberProjectRoot } from '../lib/projectRoot'
+import { apiFetch } from '../lib/api'
 
 interface BrowseResult {
   path: string
@@ -49,7 +50,7 @@ export default function FileBrowser({ root, onSelect, onFilesPanelResize, onRoot
 
   const fetchDir = useCallback((path: string) => {
     setBrowseError(null)
-    fetch(`/api/browse?path=${encodeURIComponent(path)}`)
+    apiFetch(`/api/browse?path=${encodeURIComponent(path)}`)
       .then(r => r.json())
       .then((data: BrowseResult) => {
         setBrowse(data)
@@ -84,7 +85,7 @@ export default function FileBrowser({ root, onSelect, onFilesPanelResize, onRoot
     setSelectedFile(fullPath)
     setFunctions(null)
     setLoadingFns(true)
-    fetch(`/api/functions?file=${encodeURIComponent(fullPath)}`)
+    apiFetch(`/api/functions?file=${encodeURIComponent(fullPath)}`)
       .then(r => r.json())
       .then((data: { functions: FunctionInfo[] }) => {
         setFunctions(data.functions)

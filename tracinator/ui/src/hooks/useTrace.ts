@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { buildTraceIndex, type TraceIndex } from '../lib/traceIndex'
 import type { TraceResult } from '../types/trace'
+import { apiFetch } from '../lib/api'
 
 export function useTrace() {
   const [result, setResult] = useState<TraceResult | null>(null)
@@ -14,7 +15,7 @@ export function useTrace() {
     setResult(null)
     setIndex(null)
 
-    fetch(url, {
+    apiFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

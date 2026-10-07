@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Eraser, Maximize2, Minimize2, Play, X } from 'lucide-react'
 import type { FunctionInfo } from '../types/graph'
 import Onboarding from './Onboarding'
+import { apiFetch } from '../lib/api'
 
 const MAX_TEXTAREA_HEIGHT = 240
 const MIN_TEXTAREA_HEIGHT = 30
@@ -77,7 +78,7 @@ export default function TraceArgsForm({ file, fn, source, initialArgs, initialCo
     // and reuse /api/functions-from-source (the same call EditorPane already makes).
     const sourceText = DEMO_MODE
       ? Promise.resolve(source ?? '')
-      : fetch(`/api/source?file=${encodeURIComponent(file)}`)
+      : apiFetch(`/api/source?file=${encodeURIComponent(file)}`)
           .then(async (r) => {
             if (!r.ok) throw new Error()
             return r.json() as Promise<{ lines: string[] }>
@@ -86,7 +87,7 @@ export default function TraceArgsForm({ file, fn, source, initialArgs, initialCo
 
     sourceText
       .then((src) =>
-        fetch('/api/functions-from-source', {
+        apiFetch('/api/functions-from-source', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ source: src }),

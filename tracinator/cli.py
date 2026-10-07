@@ -176,16 +176,22 @@ def _launch_ui(
     function_name: str = "",
     depth: int = 3,
 ) -> None:
+    import secrets
     import threading
     import webbrowser
     import time
 
-    from tracinator.server.app import app, set_launch_config
+    from tracinator.server.app import app, set_api_token, set_launch_config
     import uvicorn
 
     set_launch_config(root=project_root, file=file_path, function=function_name, depth=depth)
 
-    url = f"http://localhost:{port}/"
+    # The page saves the token and strips it from the address bar. It's in
+    # the URL rather than the served page because a DNS-rebinding attacker
+    # can read anything this server serves, but not the user's address bar.
+    token = secrets.token_urlsafe(32)
+    set_api_token(token)
+    url = f"http://localhost:{port}/?token={token}"
 
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
     server = uvicorn.Server(config)

@@ -3,6 +3,7 @@
 // the next launch opens the same folder instead of the home directory.
 
 import { getFlag, setFlag } from './persist'
+import { apiFetch } from './api'
 
 const PROJECT_ROOT_KEY = 'tracinator_project_root'
 
@@ -16,7 +17,7 @@ export async function pickFolder(defaultPath?: string): Promise<string | null> {
 // Returns the root as the server normalised it; throws with the server's
 // message (e.g. "Folder not found: ...") when it refuses.
 export async function setServerProjectRoot(path: string): Promise<string> {
-  const resp = await fetch('/api/project-root', {
+  const resp = await apiFetch('/api/project-root', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path }),

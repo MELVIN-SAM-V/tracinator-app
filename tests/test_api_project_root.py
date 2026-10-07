@@ -8,7 +8,9 @@ from fastapi.testclient import TestClient
 from tracinator.server import app as app_module
 from tracinator.server.app import app, set_launch_config
 
-client = TestClient(app)
+# 127.0.0.1, not TestClient's default "testserver": app.py only accepts
+# local Host headers (TrustedHostMiddleware, the DNS-rebinding guard).
+client = TestClient(app, base_url="http://127.0.0.1")
 
 
 @pytest.fixture(autouse=True)

@@ -1,7 +1,11 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { captureTokenFromUrl } from './lib/api'
 import './index.css'
+
+// Before the first render, so the token is in place for App's first request.
+captureTokenFromUrl()
 
 // The desktop/CLI build only ever renders the tool itself — no marketing
 // pages, no router. Those live in the separate tracinator-site repo, which

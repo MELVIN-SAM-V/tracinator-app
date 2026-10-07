@@ -19,11 +19,41 @@ const DEFAULT_PORT: u16 = 7331;
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(30);
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
 
-/// Owns the spawned backend's `Child` (for shutdown/kill) and the port it
-/// ended up bound to (chosen at runtime — see `pick_port`).
+/// Owns the spawned backend's `Child` (for shutdown/kill), the port it
+/// ended up bound to (chosen at runtime — see `pick_port`), and the
+/// per-launch API token every /api request must carry (see `new_api_token`).
 struct BackendState {
     child: Mutex<Option<Child>>,
     port: Mutex<u16>,
+    api_token: Mutex<String>,
+}
+
+/// Name of the env var the backend reads its token from, and of the request
+/// header it expects it in (tracinator/server/app.py, API_TOKEN_ENV /
+/// API_TOKEN_HEADER).
+const API_TOKEN_ENV: &str = "TRACINATOR_API_TOKEN";
+const API_TOKEN_HEADER: &str = "X-Tracinator-Token";
+
+/// 32 random bytes, hex-encoded. The backend refuses /api requests without
+/// it, so a web page open in the user's browser can't drive it (via DNS
+/// rebinding, say) — /api/trace evaluates its args as Python, so reaching it
+/// means running arbitrary code. Hex keeps it safe to drop into a header
+/// and a JS string literal as-is.
+fn new_api_token() -> Result<String, getrandom::Error> {
+    let mut bytes = [0u8; 32];
+    getrandom::fill(&mut bytes)?;
+    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
+}
+
+/// Hands the token to the frontend without the backend ever serving it (a
+/// DNS-rebinding page can read anything the backend serves). Tauri runs
+/// initialization scripts on every page the window loads — and on Windows in
+/// subframes too — so it only sets the token on the backend's own origin.
+fn token_init_script(port: u16, token: &str) -> String {
+    format!(
+        "if (window.location.origin === 'http://127.0.0.1:{port}') {{ \
+         window.__TRACINATOR_API_TOKEN__ = '{token}'; }}"
+    )
 }
 
 /// Tries `cli.py`'s own default port first so a dev used to `tracinator ui`
@@ -61,7 +91,12 @@ fn default_project_root(handle: &AppHandle) -> PathBuf {
         .unwrap_or_else(|_| std::env::temp_dir())
 }
 
-fn spawn_backend(runtime: &ServerRuntime, port: u16, root: &Path) -> std::io::Result<Child> {
+fn spawn_backend(
+    runtime: &ServerRuntime,
+    port: u16,
+    root: &Path,
+    api_token: &str,
+) -> std::io::Result<Child> {
     let mut cmd = Command::new(&runtime.python);
     // -P (PYTHONSAFEPATH, 3.11+): `-m` normally prepends cwd to sys.path,
     // which would let a *traced project* that happens to contain a
@@ -82,6 +117,8 @@ fn spawn_backend(runtime: &ServerRuntime, port: u16, root: &Path) -> std::io::Re
     if let Some(pythonpath) = &runtime.pythonpath {
         cmd.env("PYTHONPATH", pythonpath);
     }
+    // Read (and removed from its environment) by app.py at import.
+    cmd.env(API_TOKEN_ENV, api_token);
 
     #[cfg(windows)]
     {
@@ -148,9 +185,9 @@ async fn get(port: u16, path: &str) -> Option<String> {
     Some(String::from_utf8_lossy(&buf).into_owned())
 }
 
-async fn post(port: u16, path: &str) {
+async fn post(port: u16, path: &str, api_token: &str) {
     let request = format!(
-        "POST {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        "POST {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n{API_TOKEN_HEADER}: {api_token}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     );
     if let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)).await {
         let _ = stream.write_all(request.as_bytes()).await;
@@ -192,8 +229,17 @@ async fn boot(handle: AppHandle) {
         }
     };
 
+    let api_token = match new_api_token() {
+        Ok(token) => token,
+        Err(e) => {
+            fatal(&handle, format!("Failed to generate Tracinator's session token: {e}"));
+            return;
+        }
+    };
+    *handle.state::<BackendState>().api_token.lock().unwrap() = api_token.clone();
+
     let root = default_project_root(&handle);
-    let child = match spawn_backend(&runtime, port, &root) {
+    let child = match spawn_backend(&runtime, port, &root, &api_token) {
         Ok(child) => child,
         Err(e) => {
             fatal(&handle, format!("Failed to start Tracinator's backend: {e}"));
@@ -216,6 +262,7 @@ async fn boot(handle: AppHandle) {
         "main",
         WebviewUrl::External(url.parse().expect("constructed URL is valid")),
     )
+    .initialization_script(token_init_script(port, &api_token))
     .title("Tracinator")
     .inner_size(1280.0, 800.0)
     .min_inner_size(760.0, 480.0)
@@ -251,8 +298,9 @@ async fn boot(handle: AppHandle) {
 async fn shutdown_backend(handle: &AppHandle) {
     let state = handle.state::<BackendState>();
     let port = *state.port.lock().unwrap();
+    let api_token = state.api_token.lock().unwrap().clone();
     if port != 0 {
-        post(port, "/api/shutdown").await;
+        post(port, "/api/shutdown", &api_token).await;
     }
 
     let deadline = Instant::now() + SHUTDOWN_GRACE;
@@ -291,6 +339,7 @@ pub fn run() {
         .manage(BackendState {
             child: Mutex::new(None),
             port: Mutex::new(0),
+            api_token: Mutex::new(String::new()),
         })
         .setup(|app| {
             if cfg!(debug_assertions) {

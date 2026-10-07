@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { PyProjectContext, TracinatorConfig } from '../types/graph'
+import { apiFetch } from '../lib/api'
 
 export function useGraph() {
   const [context, setContext] = useState<PyProjectContext | null>(null)
@@ -18,7 +19,7 @@ export function useGraph() {
       root: config.root ?? '',
     })
 
-    fetch(`/api/graph?${params}`)
+    apiFetch(`/api/graph?${params}`)
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({ detail: res.statusText }))
@@ -35,7 +36,7 @@ export function useGraph() {
     setError(null)
     setContext(null)
 
-    fetch('/api/graph-from-source', {
+    apiFetch('/api/graph-from-source', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ source, function: fn, depth }),

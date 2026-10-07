@@ -2,13 +2,15 @@ from __future__ import annotations
 import ast
 import asyncio
 import os
+import secrets
 import shutil
 import sys
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -29,10 +31,58 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+API_TOKEN_HEADER = "X-Tracinator-Token"
+API_TOKEN_ENV = "TRACINATOR_API_TOKEN"
+SESSION_TOKEN_MISSING_DETAIL = (
+    "Missing or invalid session token. Open Tracinator from the link printed "
+    "in the terminal, or restart the desktop app."
+)
+# Read at import so every launcher that sets the variable gets the check: the
+# desktop shell, dev_app.sh, and each `uvicorn --reload` worker (they inherit
+# it from the reloader). Popped, not just read: traced code runs as a child
+# of this process and copies os.environ, and it has no business seeing it.
+_api_token: str | None = os.environ.pop(API_TOKEN_ENV, None) or None
+
+
+@app.middleware("http")
+async def require_api_token(request: Request, call_next):
+    """Every /api route except /api/health needs the per-launch token the
+    desktop shell or `tracinator ui` generated, so a web page the user
+    happens to have open can't drive this server: /api/trace evaluates its
+    args as Python source, so reaching it means running arbitrary code.
+    The page itself (index.html, /assets) stays open since it carries no
+    token; the frontend gets it from the desktop window or the launch URL
+    instead. OPTIONS preflights pass through to CORSMiddleware. With no
+    token configured (tests, a hand-started uvicorn) the check is off and
+    TrustedHostMiddleware below is the remaining guard.
+    """
+    path = request.url.path
+    if (
+        _api_token is not None
+        and path.startswith("/api/")
+        and path != "/api/health"
+        and request.method != "OPTIONS"
+    ):
+        supplied = request.headers.get(API_TOKEN_HEADER, "")
+        if not secrets.compare_digest(supplied.encode(), _api_token.encode()):
+            return JSONResponse(status_code=401, content={"detail": SESSION_TOKEN_MISSING_DETAIL})
+    return await call_next(request)
+
+
+# Outermost, since it's added last: rejects a request before anything else
+# runs. A DNS-rebound request (attacker page whose domain now resolves to
+# 127.0.0.1) still carries the attacker's domain in Host, so this alone
+# stops rebinding even where the token isn't configured.
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
+
 _launch_config: dict = {}
 _project_root: str = str(Path.cwd())
 _python_executable_override: str | None = None
 _server_ref = None
+# Temp files /api/graph-from-source wrote for Editor-tab code. /api/trace runs
+# these with tracinator's own interpreter rather than the Local File
+# project's, so pasted code behaves the same whatever folder is open.
+_editor_source_files: set[str] = set()
 
 _BROWSE_EXCLUDES = {'.git', '.venv', 'venv', '__pycache__', 'node_modules', '.mypy_cache', '.pytest_cache', 'dist', 'build'}
 
@@ -50,6 +100,11 @@ def set_launch_config(root: str, file: str = "", function: str = "", depth: int 
 def set_python_executable_override(path: str | None) -> None:
     global _python_executable_override
     _python_executable_override = path
+
+
+def set_api_token(token: str | None) -> None:
+    global _api_token
+    _api_token = token
 
 
 def set_server_ref(server) -> None:
@@ -94,6 +149,7 @@ async def graph_from_source(body: SourceRequest):
     with tempfile.NamedTemporaryFile(suffix=".py", mode="w", encoding="utf-8", delete=False) as f:
         f.write(body.source)
         tmp_path = f.name
+    _editor_source_files.add(str(Path(tmp_path).resolve()))
     try:
         ctx = build_project_context(
             file_path=tmp_path,
@@ -136,13 +192,19 @@ async def trace(body: TraceRequest):
     path = Path(body.file)
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"File not found: {body.file}")
+    # None makes trace_call_tree fall back to sys.executable (tracinator's own,
+    # the bundled one in the desktop app) — see _editor_source_files.
+    if str(path.resolve()) in _editor_source_files:
+        python_executable = None
+    else:
+        python_executable = resolve_python_executable(_project_root)
     try:
         result = trace_call_tree(
             str(path),
             body.function,
             body.args,
             body.constructor_args,
-            python_executable=resolve_python_executable(_project_root),
+            python_executable=python_executable,
         )
     except RuntimeError as e:
         result = {"events": [], "return_value": None, "error": str(e), "truncated": False}

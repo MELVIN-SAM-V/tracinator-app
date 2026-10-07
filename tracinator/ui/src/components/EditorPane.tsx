@@ -3,6 +3,7 @@ import Editor from '@monaco-editor/react'
 import { ChevronDown, Zap } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { FunctionInfo } from '../types/graph'
+import { apiFetch } from '../lib/api'
 
 interface Props {
   onRun: (source: string, fn: string) => void
@@ -35,7 +36,7 @@ export default function EditorPane({ onRun, loading }: Props) {
   const fetchAndRun = (code: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      fetch('/api/functions-from-source', {
+      apiFetch('/api/functions-from-source', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source: code }),
